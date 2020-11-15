@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="0135229d-fb03-4669-9fd8-be0907761db1" >
+		<http:listener-connection host="0.0.0.0" port="8085" />
+	</http:listener-config>
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="474657e2-edbf-4f3b-8eb5-69592ce7897c" >
+		<salesforce:basic-connection username="c.vasanthi27@cognizant.com" password="Southend123" securityToken="D2QrveHIDje93wrfxDEwwL5Pn" />
+	</salesforce:sfdc-config>
+	<file:config name="File_Config" doc:name="File Config" doc:id="f105e0f2-0693-4e62-90fa-0acd314e8eea" />
+	<flow name="mulesoft-sfdc-accountcreationflow" doc:id="5b48db2c-b37a-4017-9025-97c03a00902e" >
+		<http:listener doc:name="Listener" doc:id="a52d4af1-a4da-4b6e-b5d8-7722e4e4535b" config-ref="HTTP_Listener_config" path="/createRecord"/>
+		<ee:transform doc:name="Read input from file" doc:id="4854cd9a-f8c2-4592-ad2b-56c6cb57c337" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var filedata = readUrl("classpath://MyFiles/inputFile.json","application/json")
+---
+filedata
+//[{
+//("name":"test account"),
+//("Custom_Date_Time__c":now() as DateTime {format:"yyyy-MM-dd'T'HH:mm:ss.SSSZ"})
+//}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create type="Account" doc:name="Create Account in Salesforce" doc:id="efa361ea-cd52-47ba-b334-74761918725c" config-ref="Salesforce_Config"/>
+		<ee:transform doc:name="Transform Message" doc:id="aaefb9f5-8b9f-4bfb-ba70-cc433cd0dc66" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(payload.items map {
+
+ (id:$.id)  
+
+ })[0] ]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="5fe2616d-2713-4416-b4c2-a67f68384d9d" message="Account Created successfully. Account id is: #[payload.id]" />
+		<salesforce:query doc:name="Query" doc:id="40f7d6c8-1dca-4304-bb47-b9dadbeca164" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query ><![CDATA[Select Id, Name from Account where Id = ':accId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	accId : payload.id
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<logger level="INFO" doc:name="Logger" doc:id="96ba6184-4d52-482d-a5a7-e057857c8618" message="Account queried successfully. Account name is: #[payload.Name]"/>
+		<ee:transform doc:name="Transform Message" doc:id="b07d6eca-de23-4fdd-8636-0252b1c8a620" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map {
+	"ID" : $.Id,
+	"Name" : $.Name
+	} ]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="a4ecbbcc-5328-4b46-8093-9cf33d27f31e" />
+	</flow>
+	<flow name="mulesoft-sfdc-casecreationflow" doc:id="ca4d2a4c-4c86-4901-91e4-f464adbee573" >
+		<http:listener doc:name="Listener" doc:id="28b45de5-1800-428c-ae8b-b08beb5c51c8" config-ref="HTTP_Listener_config" path="/createCaseRecord"/>
+		<ee:transform doc:name="Direct input" doc:id="42917640-1f87-4ac6-9247-fbbfcc172b07" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+[{
+    "Status":"Working",
+    "Origin":"Web",
+    "Subject":now() as String {format: "y-MM-dd HH:mm:ss.SSS"} 
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create type="Case" doc:name="Create Case" doc:id="0ee33612-9044-4224-b76e-4dba6dc80c45" config-ref="Salesforce_Config"/>
+		<ee:transform doc:name="Transform Message" doc:id="4eb81a11-417c-4fa1-bee5-b037fd5b6b1e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(payload.items map {
+
+ (id:$.id)  
+
+ })[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="f6f08e38-1123-4ba7-947e-91e8c812f57e" message="Case created successfully, Case Id is: #[payload.id]" />
+		<salesforce:query doc:name="Query" doc:id="b90e372b-a3e6-4f87-b378-1de0961bff1e" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query ><![CDATA[Select Id, CaseNumber, Subject from Case where Id=':caseId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	caseId : payload.id
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<logger level="INFO" doc:name="Logger" doc:id="91a7d4a7-2995-4b89-a8dc-7ac82d9b3abd" message="Record Queried successfully. Casenumber is: #[payload.CaseNumber]"/>
+		<ee:transform doc:name="Transform Message" doc:id="85a04ba1-fd7c-4263-b43f-c870659e8feb" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map {
+	"ID" : $.Id,
+	"CaseNumber" : $.CaseNumber,
+	"Subject":$.Subject
+	} ]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="0a6162e2-fd57-40ab-9688-e7e0b23961e7" />
+	</flow>
+	<flow name="mulesoft-sfdc-AccountQueryFlow" doc:id="875df6fd-f988-42b2-af51-8ef625f662af" >
+		<http:listener doc:name="Listener" doc:id="60be0acd-a5df-45bb-a9d4-40ecaa080f3f" config-ref="HTTP_Listener_config" path="/querySfRecords" allowedMethods="GET"/>
+		<ee:transform doc:name="Transform Message" doc:id="18f30327-711f-4524-9ea6-069764314ed2" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+var queryInput = readUrl("classpath://MyFiles/queryInput.json","application/json")
+---
+queryInput]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<choice doc:name="Choice" doc:id="7115354c-c0c1-4c36-b85a-d15353642175" >
+			<when expression="#[payload.Name != '']">
+				<salesforce:query doc:name="Query" doc:id="f4615a3b-1bde-47a4-aeae-550d256c51ea" config-ref="Salesforce_Config">
+					<salesforce:salesforce-query ><![CDATA[Select Id, Name from Account Where Name Like '%:nameVar%']]></salesforce:salesforce-query>
+					<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	nameVar : payload.Name
+}]]]></salesforce:parameters>
+				</salesforce:query>
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name="Logger" doc:id="32bb9dee-2675-4ac1-8fa2-050bde264258" message="Please Provide Account Name to query"/>
+			</otherwise>
+		</choice>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="6c0eb5d0-5015-4c3f-a780-8d7cc38914e1" />
+		<ee:transform doc:name="Transform Message" doc:id="2078e9b5-acc2-4f9f-bdd0-2e80e4fef646" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="mulesoft-sfdc-TSPassFlow" doc:id="0474b8a7-1807-4bcc-8e0d-6ef9963cd060" >
+		<http:listener doc:name="Listener" doc:id="2e19240f-cc58-45df-816b-5689b5fd65d1" config-ref="HTTP_Listener_config" path="/createTestSuite"/>
+		<ee:transform doc:name="Transform Message" doc:id="4efdf3cf-65a7-4e86-b9db-298d1f1954d7" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	"provarti__Name__c":now() as String {format: "'Test Suite 'y-MM-dd HH:mm:ss"}
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create doc:name="Create" doc:id="3bfb8ddd-f4a4-4319-81cf-b43028d86903" config-ref="Salesforce_Config" type="provarti__Test_Suite_Execution__c"/>
+		<ee:transform doc:name="Transform Message" doc:id="3383bdef-0e59-402f-abb9-e367a5023f6a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(payload.items map {
+
+ (id:$.id)  
+
+ })[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<file:write doc:name="Write" doc:id="f9fa2aaa-cae4-4c78-937e-394a300d182e" config-ref="File_Config" path='.\src\main\resources\MyFiles\outputFile.json'/>
+		<logger level="INFO" doc:name="Logger" doc:id="f64e079a-b9fa-493c-87b9-9e75f48ca161" message="Test Suite ID is: #[payload.id]"/>
+		<ee:transform doc:name="Transform Message" doc:id="94d2c014-1615-4dc0-96b8-7acb211aa584" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	"provarti__Test_Suite_Execution__c":payload.id,
+	"provarti__Name__c":"TC01",
+	"provarti__Status__c" : "Pass",
+    "provarti__End_Date_Time__c": now() as DateTime {format: "y-MM-dd'T'HH:mm:ss.SSSZ"}
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create doc:name="Create" doc:id="a142d889-ab36-4f2b-b1e2-bcbf94d7e2a9" config-ref="Salesforce_Config" type="provarti__Test_Case_Execution__c"/>
+		<ee:transform doc:name="Transform Message" doc:id="817ec3ff-5f28-467d-8a27-08631c09c6b1" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(payload.items map {
+
+ (id:$.id)  
+
+ })[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="af92f0be-7843-4c8f-bccb-e563b7f84253" message="Result Response: #[payload]"/>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="e65ffa27-783f-4812-b539-89451a116567" />
+	</flow>
+	<flow name="mulesoft-sfdc-TCFailFlow" doc:id="23c81321-d88f-48a2-8d20-419999e4ccbf" >
+		<http:listener doc:name="Listener" doc:id="7fc56393-3cca-4740-afa5-68de4e0a4348" config-ref="HTTP_Listener_config" path="createTestSuite1"/>
+		<ee:transform doc:name="Transform Message" doc:id="486ca657-e7aa-422e-8547-0feee1e6a39a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	"provarti__Name__c":now() as String {format: "'Test Suite 'y-MM-dd HH:mm:ss"}
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create doc:name="Create" doc:id="704db18f-3db5-4493-be11-90fde77bc8f6" config-ref="Salesforce_Config" type="provarti__Test_Suite_Execution__c"/>
+		<ee:transform doc:name="Transform Message" doc:id="fab42b73-2d05-443b-8423-b999b1466a68" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(payload.items map {
+
+ (id:$.id)  
+
+ })[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<file:write doc:name="Write" doc:id="5d1fb6ae-024a-4edf-99ce-6d5ed4ed7735" config-ref="File_Config" path=".\src\main\resources\MyFiles\outputFile.json"/>
+		<logger level="INFO" doc:name="Logger" doc:id="127e09e4-64ae-41d5-af87-eaa4063554e1" message="Test Suite Id is: #[payload.id]"/>
+		<ee:transform doc:name="Transform Message" doc:id="2a626085-748a-41bb-b17e-a4bfa2587a3e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	"provarti__Test_Suite_Execution__c":payload.id,
+	"provarti__Name__c":"TC01",
+	"provarti__Status__c" : "Fail",
+    "provarti__End_Date_Time__c": now() as DateTime {format: "y-MM-dd'T'HH:mm:ss.SSSZ"}
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create doc:name="Create" doc:id="f8200978-1062-45f1-a712-71504d44cd98" config-ref="Salesforce_Config" type="provarti__Test_Case_Execution__c"/>
+		<ee:transform doc:name="Transform Message" doc:id="d2db80a2-bd09-4db3-a10f-a20c3bcaa50b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(payload.items map {
+
+ (id:$.id)  
+
+ })[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="1905c6eb-b3c9-4b35-9170-faee8c2c92e4" message="Result Response: #[payload]"/>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="d251ccee-311e-4d37-8c5c-dff2d59be2e2" />
+	</flow>
+</mule>
