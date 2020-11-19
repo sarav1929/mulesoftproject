@@ -56,7 +56,7 @@ http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mu
 			</choice>
 		</munit:validation>
 	</munit:test>
-	<munit:test name="mulesoft-sfdc-connector-test-suite-mulesoft-sfdc-AccountQueryFlowTest" doc:id="88ea0ac1-faea-464a-8486-f904419e632e" description="Test" tags="sys">
+	<munit:test name="mulesoft-sfdc-connector-test-suite-mulesoft-sfdc-AccountQueryFlowTest" doc:id="88ea0ac1-faea-464a-8486-f904419e632e" description="Test" tags="int">
 		<munit:execution >
 			<flow-ref doc:name="Flow-ref to mulesoft-sfdc-AccountQueryFlow" doc:id="1f97d7d1-500e-4c84-bed5-933fe30aa0e9" name="mulesoft-sfdc-AccountQueryFlow"/>
 		</munit:execution>
