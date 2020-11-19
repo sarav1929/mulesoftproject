@@ -122,9 +122,9 @@ payload map {
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
 output application/json
-var queryInput = readUrl("classpath://MyFiles/queryInput.json","application/json")
+var createInput = readUrl("classpath://MyFiles/queryInput.json","application/json")
 ---
-queryInput]]></ee:set-payload>
+createInput]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
 		<choice doc:name="Choice" doc:id="7115354c-c0c1-4c36-b85a-d15353642175" >
@@ -152,7 +152,122 @@ payload]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
 	</flow>
-	<flow name="mulesoft-sfdc-TSPassFlow" doc:id="0474b8a7-1807-4bcc-8e0d-6ef9963cd060" >
+	<flow name="mulesoft-sfdc-TestSuiteCreation" doc:id="8645e443-8e2d-47c7-bdad-0b2a1344d8c6" >
+		<http:listener doc:name="Listener" doc:id="94f27c80-02b8-488c-ae17-0fc1226ffb90" config-ref="HTTP_Listener_config" path="/createTs"/>
+		<ee:transform doc:name="Transform Message" doc:id="1149fcce-1d6d-4fab-b60f-ee000abb81b7" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	"provarti__Name__c":now() as String {format: "'Test Suite 'y-MM-dd HH:mm:ss"}
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create doc:name="Create" doc:id="b09299d6-2523-4c60-b9ae-73354cfa6506" config-ref="Salesforce_Config" type="provarti__Test_Suite_Execution__c"/>
+		<ee:transform doc:name="Transform Message" doc:id="dcbff60b-f1fd-4861-a274-bedcafde71dc" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(payload.items map {
+
+ (id:$.id)  
+
+ })[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<file:write doc:name="Write" doc:id="0e54d2c1-52d8-466d-a4a8-cf708dc70fc7" path=".\src\main\resources\MyFiles\outputFileTS.json"/>
+		<logger level="INFO" doc:name="Logger" doc:id="1eccccb4-a34a-4c79-b44c-52f74a7b21c1" message="Test Suite ID is: #[payload.id]"/>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="72261b26-7773-4260-bf25-322d7c3b6778" />
+	</flow>
+	<flow name="mulesoft-sfdc-TCEPassFlow" doc:id="47ac77d1-cec1-42db-8d4b-ff0ff61ac2e4" >
+		<http:listener doc:name="Listener" doc:id="6fe4ee8b-0af9-40df-a8ad-cf708dd7252f" config-ref="HTTP_Listener_config" path="/tcePassFlow"/>
+		<file:read doc:name="Read" doc:id="7b19349d-8db0-4065-9b38-749b4bdff28d" config-ref="File_Config" path=".\src\main\resources\MyFiles\outputFileTS.json"/>
+		<ee:transform doc:name="Transform Message" doc:id="c7bf49dc-e513-4f66-8632-9d322addea73" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="tsID" ><![CDATA[%dw 2.0
+output application/json
+---
+payload ]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="647dec56-21fa-4823-9636-5b6137c7ae41" message="Test Suite ID is: #[payload]"/>
+		<ee:transform doc:name="Transform Message" doc:id="b5751a66-00d2-4982-8936-76fede7213cb" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	"provarti__Test_Suite_Execution__c":payload.id,
+	"provarti__Name__c":flow.Name,
+	"provarti__Status__c" : "Pass",
+	"provarti__Start_Date_Time__c": now() as DateTime {format: "y-MM-dd'T'HH:mm:ss.SSSZ"},
+    "provarti__End_Date_Time__c": now() as DateTime {format: "y-MM-dd'T'HH:mm:ss.SSSZ"}
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create doc:name="Create" doc:id="124ae636-fb93-4fa7-8391-8ece65f0437f" config-ref="Salesforce_Config" type="provarti__Test_Case_Execution__c"/>
+		<ee:transform doc:name="Transform Message" doc:id="599f34e1-bc23-42ec-99ca-05371b4cdd51" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(payload.items map {
+
+ (id:$.id)  
+
+ })[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="25285233-ec63-462d-bcca-9c652a20ebbf" message="Result Response: #[payload]"/>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="dcb0a5a7-00df-49cc-b5ad-5073fb101c8a" />
+	</flow>
+	<flow name="mulesoft-sfdc-TCEFailFlow" doc:id="7f3a1245-a115-4779-9791-b29e842cb93e" >
+		<http:listener doc:name="Listener" doc:id="a9653ac5-af9b-4dbd-b18c-59863bea165e" config-ref="HTTP_Listener_config" path="/tceFailFlow"/>
+		<file:read doc:name="Read" doc:id="c681ebab-875a-4f53-8778-48ae59ce53cc" path=".\src\main\resources\MyFiles\outputFileTS.json"/>
+		<ee:transform doc:name="Transform Message" doc:id="7fcd66e4-a695-4784-b896-a0a46a57e842" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="tsId" ><![CDATA[output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="4939f881-c675-4213-9332-d32ad9aa266a" message="Test Suite ID is: #[payload]"/>
+		<ee:transform doc:name="Transform Message" doc:id="866d3c6a-a565-4407-a3da-394e448b607f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	"provarti__Test_Suite_Execution__c":payload.id,
+	"provarti__Name__c":flow.Name,
+	"provarti__Status__c" : "Fail",
+    "provarti__End_Date_Time__c": now() as DateTime {format: "y-MM-dd'T'HH:mm:ss.SSSZ"}
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create doc:name="Create" doc:id="55378278-92ec-4044-bc4d-f1c716ee0aa5" config-ref="Salesforce_Config" type="provarti__Test_Case_Execution__c"/>
+		<ee:transform doc:name="Transform Message" doc:id="563aaf2d-4341-4c31-8af0-808aa59694cd" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(payload.items map {
+
+ (id:$.id)  
+
+ })[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="4aa4efc4-3394-4beb-bbf3-69e2dcf489b3" message="Result Response: #[payload]"/>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="578d9d0a-c4a3-4ba8-bf02-687f541f2351" />
+	</flow>
+	<flow name="mulesoft-sfdc-TCPassFlow" doc:id="0474b8a7-1807-4bcc-8e0d-6ef9963cd060" >
 		<http:listener doc:name="Listener" doc:id="2e19240f-cc58-45df-816b-5689b5fd65d1" config-ref="HTTP_Listener_config" path="/createTestSuite"/>
 		<ee:transform doc:name="Transform Message" doc:id="4efdf3cf-65a7-4e86-b9db-298d1f1954d7" >
 			<ee:message >
@@ -185,9 +300,10 @@ output application/json
 output application/java
 ---
 [{
-	"provarti__Test_Suite_Execution__c":payload.id,
-	"provarti__Name__c":"TC01",
+    "provarti__Test_Suite_Execution__c":payload.id,
+	"provarti__Name__c":flow.Name,
 	"provarti__Status__c" : "Pass",
+	"provarti__Start_Date_Time__c": now() as DateTime {format: "y-MM-dd'T'HH:mm:ss.SSSZ"},
     "provarti__End_Date_Time__c": now() as DateTime {format: "y-MM-dd'T'HH:mm:ss.SSSZ"}
 }]]]></ee:set-payload>
 			</ee:message>
@@ -242,8 +358,9 @@ output application/java
 ---
 [{
 	"provarti__Test_Suite_Execution__c":payload.id,
-	"provarti__Name__c":"TC01",
+	"provarti__Name__c":flow.Name,
 	"provarti__Status__c" : "Fail",
+	"provarti__Start_Date_Time__c": now() as DateTime {format: "y-MM-dd'T'HH:mm:ss.SSSZ"},
     "provarti__End_Date_Time__c": now() as DateTime {format: "y-MM-dd'T'HH:mm:ss.SSSZ"}
 }]]]></ee:set-payload>
 			</ee:message>
